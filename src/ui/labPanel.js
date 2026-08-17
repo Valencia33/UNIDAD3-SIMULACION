@@ -35,25 +35,6 @@ function rangeRow(parent, label, object, key, min, max, step, onInput, getValue)
   };
 }
 
-function checkRow(parent, label, initial, onChange, getValue) {
-  const wrap = document.createElement('div');
-  wrap.className = 'row';
-  const lab = document.createElement('label');
-  const name = document.createElement('span');
-  name.textContent = label;
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = initial;
-  input.addEventListener('change', () => onChange(input.checked));
-  lab.append(name, input);
-  wrap.append(lab);
-  parent.append(wrap);
-  return {
-    input,
-    refresh() { if (getValue) input.checked = Boolean(getValue()); }
-  };
-}
-
 function button(parent, label, onClick) {
   const b = document.createElement('button');
   b.textContent = label;
@@ -66,64 +47,80 @@ export function createLabPanel({ params, onReset, onPreset, onModeChange, onPaus
   const refreshers = [];
   const panel = document.createElement('aside');
   panel.className = 'panel';
+  
   panel.innerHTML = `
-    <h1>U3 · Forces Instrument</h1>
-    <p>LAB: aísla fuerzas, predice y prueba. <strong>P</strong> cambia a PERFORMANCE.</p>
+    <style>
+      .desc { font-size: 10px; color: #8892b0; margin-top: -6px; margin-bottom: 12px; line-height: 1.3; }
+    </style>
+    <h1>U3 · LesAlpx Instrument</h1>
+    <p>Post-Procesamiento Activo.</p>
   `;
 
-  const sim = document.createElement('div');
-  sim.className = 'group';
-  sim.innerHTML = '<h2>Simulación</h2>';
-  panel.append(sim);
-
   const state = {
-    timeScale: params.timeScale.value,
-    maxSpeed: params.maxSpeed.value,
-    particleSize: params.particleSize.value,
-    radialStrength: params.radialStrength.value,
-    vortexStrength: params.vortexStrength.value,
-    dragCoefficient: params.dragCoefficient.value,
-    windX: params.wind.value.x,
-    windY: params.wind.value.y
+    ringRadius: params.ringRadius.value,
+    gravityStrength: params.gravityStrength.value,
+    swirlStrength: params.swirlStrength.value,
+    
+    ring2Radius: params.ring2Radius.value,
+    ring2Gravity: params.ring2Gravity.value,
+    highsSwirl: params.highsSwirl.value,
+    highsTurbulence: params.highsTurbulence.value,
+    
+    damping: params.damping.value,
+
+    fishEye: params.fishEye.value,
+    chromaticAberration: params.chromaticAberration.value,
+    bloomStrength: params.bloomStrength.value,
+    vignette: params.vignette.value
   };
 
-  refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
-  refreshers.push(rangeRow(sim, 'maxSpeed', state, 'maxSpeed', 0.2, 12, 0.1, (v) => params.maxSpeed.value = v, () => params.maxSpeed.value));
-  refreshers.push(rangeRow(sim, 'particleSize', state, 'particleSize', 0.005, 0.1, 0.001, (v) => params.particleSize.value = v, () => params.particleSize.value));
+  const gravesGroup = document.createElement('div');
+  gravesGroup.className = 'group';
+  gravesGroup.innerHTML = `
+    <h2>1. Graves (Moradas)</h2>
+    <p class="desc">Conforma la base rítmica. Espacio hace estallar este anillo (kick).</p>
+  `;
+  panel.append(gravesGroup);
+  refreshers.push(rangeRow(gravesGroup, 'Radio Anillo', state, 'ringRadius', 0, 10, 0.1, (v) => params.ringRadius.value = v, () => params.ringRadius.value));
+  refreshers.push(rangeRow(gravesGroup, 'Atracción a Base', state, 'gravityStrength', 0, 10, 0.1, (v) => params.gravityStrength.value = v, () => params.gravityStrength.value));
+  refreshers.push(rangeRow(gravesGroup, 'Vel. Rotación', state, 'swirlStrength', -10, 10, 0.1, (v) => params.swirlStrength.value = v, () => params.swirlStrength.value));
 
-  const force = document.createElement('div');
-  force.className = 'group';
-  force.innerHTML = '<h2>Fuerzas</h2>';
-  panel.append(force);
+  const agudosGroup = document.createElement('div');
+  agudosGroup.className = 'group';
+  agudosGroup.innerHTML = `
+    <h2>2. Agudos (Azules)</h2>
+    <p class="desc">En Performance, el Ratón controla su radio y turbulencia.</p>
+  `;
+  panel.append(agudosGroup);
+  refreshers.push(rangeRow(agudosGroup, 'Radio Anillo 2', state, 'ring2Radius', 0, 15, 0.1, (v) => params.ring2Radius.value = v, () => params.ring2Radius.value));
+  refreshers.push(rangeRow(agudosGroup, 'Atracción a Anillo 2', state, 'ring2Gravity', 0, 10, 0.1, (v) => params.ring2Gravity.value = v, () => params.ring2Gravity.value));
+  refreshers.push(rangeRow(agudosGroup, 'Caos / Turbulencia', state, 'highsTurbulence', 0, 20, 0.1, (v) => params.highsTurbulence.value = v, () => params.highsTurbulence.value));
 
-  refreshers.push(checkRow(force, 'Radial', params.radialEnabled.value > 0, (v) => params.radialEnabled.value = v ? 1 : 0, () => params.radialEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'radialStrength', state, 'radialStrength', -8, 8, 0.05, (v) => params.radialStrength.value = v, () => params.radialStrength.value));
-  refreshers.push(checkRow(force, 'Vórtice', params.vortexEnabled.value > 0, (v) => params.vortexEnabled.value = v ? 1 : 0, () => params.vortexEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'vortexStrength', state, 'vortexStrength', -8, 8, 0.05, (v) => params.vortexStrength.value = v, () => params.vortexStrength.value));
-  refreshers.push(checkRow(force, 'Drag', params.dragEnabled.value > 0, (v) => params.dragEnabled.value = v ? 1 : 0, () => params.dragEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'dragCoefficient', state, 'dragCoefficient', 0, 1, 0.01, (v) => params.dragCoefficient.value = v, () => params.dragCoefficient.value));
-  refreshers.push(checkRow(force, 'Viento', params.windEnabled.value > 0, (v) => params.windEnabled.value = v ? 1 : 0, () => params.windEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'wind.x', state, 'windX', -4, 4, 0.05, (v) => params.wind.value.x = v, () => params.wind.value.x));
-  refreshers.push(rangeRow(force, 'wind.y', state, 'windY', -4, 4, 0.05, (v) => params.wind.value.y = v, () => params.wind.value.y));
+  const physicsGroup = document.createElement('div');
+  physicsGroup.className = 'group';
+  physicsGroup.innerHTML = `
+    <h2>3. Globales</h2>
+  `;
+  panel.append(physicsGroup);
+  refreshers.push(rangeRow(physicsGroup, 'Fricción (Damping)', state, 'damping', 0, 1, 0.01, (v) => params.damping.value = v, () => params.damping.value));
 
-  const tests = document.createElement('div');
-  tests.className = 'group';
-  tests.innerHTML = '<h2>Pruebas de comportamiento</h2><p>Antes de pulsar una prueba, predice qué debería ocurrir.</p>';
-  panel.append(tests);
-  for (const [id, label] of [
-    ['inertia', '1 · Inercia'],
-    ['wind', '2 · Fuerza constante +X'],
-    ['attract', '3 · Atracción'],
-    ['repel', '4 · Repulsión'],
-    ['vortex', '5 · Vórtice']
-  ]) button(tests, label, () => onPreset(id));
+  const postGroup = document.createElement('div');
+  postGroup.className = 'group';
+  postGroup.innerHTML = `
+    <h2>4. Lente (Post-Procesamiento)</h2>
+    <p class="desc">Distorsión de barril, separación RGB y resplandor.</p>
+  `;
+  panel.append(postGroup);
+  refreshers.push(rangeRow(postGroup, 'Fish Eye', state, 'fishEye', -0.5, 1.0, 0.01, (v) => params.fishEye.value = v, () => params.fishEye.value));
+  refreshers.push(rangeRow(postGroup, 'Aberración Crom.', state, 'chromaticAberration', 0, 0.05, 0.001, (v) => params.chromaticAberration.value = v, () => params.chromaticAberration.value));
+  refreshers.push(rangeRow(postGroup, 'Bloom (Glow)', state, 'bloomStrength', 0, 0.02, 0.001, (v) => params.bloomStrength.value = v, () => params.bloomStrength.value));
+  refreshers.push(rangeRow(postGroup, 'Viñeta', state, 'vignette', 0, 2.0, 0.05, (v) => params.vignette.value = v, () => params.vignette.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';
   actions.innerHTML = '<h2>Acciones</h2>';
   panel.append(actions);
   button(actions, 'Reset', onReset);
-  button(actions, 'Pausar / continuar', () => onPauseChange());
   button(actions, 'LAB / PERFORMANCE', () => onModeChange());
 
   document.body.append(panel);

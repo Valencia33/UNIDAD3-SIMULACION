@@ -1,29 +1,36 @@
 import * as THREE from 'three/webgpu';
 import { uniform } from 'three/tsl';
 
-// Uniforms are CPU-side values that TSL exposes to the GPU.
-// Changing .value does not rebuild the compute shader.
 export function createParameters() {
   return {
     dt: uniform(1 / 60),
     timeScale: uniform(1.0),
     initialSpeed: uniform(0.35),
-    maxSpeed: uniform(5.0),
+    maxSpeed: uniform(12.0),
     boundsSize: uniform(10.0),
-    particleSize: uniform(0.035),
+    particleSize: uniform(0.04),
 
-    windEnabled: uniform(0.0),
-    wind: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
+    time: uniform(0.0),
 
-    radialEnabled: uniform(1.0),
-    attractor: uniform(new THREE.Vector3(0.0, 0.0, 0.0)),
-    radialStrength: uniform(2.2),
-    softening: uniform(0.35),
+    // FRECUENCIAS GRAVES (Anillo Morado)
+    ringRadius: uniform(3.0),
+    gravityStrength: uniform(6.0),
+    swirlStrength: uniform(2.0),
+    kickForce: uniform(0.0), 
 
-    vortexEnabled: uniform(1.0),
-    vortexStrength: uniform(1.4),
+    // FRECUENCIAS AGUDAS (Anillo Azul)
+    ring2Radius: uniform(5.0), 
+    ring2Gravity: uniform(4.0), 
+    highsSwirl: uniform(3.0), 
+    highsTurbulence: uniform(2.0), 
 
-    dragEnabled: uniform(1.0),
-    dragCoefficient: uniform(0.12)
+    // GLOBALES
+    damping: uniform(0.15),
+
+    // POST-PROCESAMIENTO
+    fishEye: uniform(0.25), // Distorsión de lente
+    chromaticAberration: uniform(0.008), // Separación RGB
+    bloomStrength: uniform(0.006), // Resplandor
+    vignette: uniform(0.85) // Oscurecimiento de bordes
   };
 }
