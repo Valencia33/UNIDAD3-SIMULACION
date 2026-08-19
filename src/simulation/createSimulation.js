@@ -42,7 +42,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
 
-    // EL SPLIT DE FRECUENCIAS
     const pID = hash(instanceIndex);
     const isHigh = step(0.5, pID); 
     const isGrave = step(pID, 0.5); 
@@ -52,13 +51,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const currentDir = pXZ.div(distXZ);
     const swirlDir = vec3(p.z.mul(-1.0), 0.0, p.x).normalize();
 
-    // GRAVES (Anillo Morado)
+    // GRAVES 
     const ringTarget = currentDir.mul(params.ringRadius);
     const graveForce = ringTarget.sub(p).mul(params.gravityStrength);
     graveForce.addAssign(currentDir.mul(params.kickForce));
     graveForce.addAssign(swirlDir.mul(params.swirlStrength));
 
-    // AGUDOS (Anillo Azul)
+    // AGUDOS 
     const ring2Target = currentDir.mul(params.ring2Radius);
     const agudoForce = ring2Target.sub(p).mul(params.ring2Gravity);
     agudoForce.addAssign(swirlDir.mul(params.highsSwirl));
@@ -71,14 +70,11 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     );
     agudoForce.addAssign(noiseForce.mul(params.highsTurbulence));
 
-    // APLICAR
     force.addAssign(graveForce.mul(isGrave));
     force.addAssign(agudoForce.mul(isHigh));
 
-    // FRICCIÓN
     force.addAssign(v.mul(params.damping).mul(-1.0));
 
-    // INTEGRACIÓN
     v.addAssign(force.mul(dt));
 
     const speed = v.length();
@@ -92,7 +88,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     p.assign(mod(p.add(half), params.boundsSize).sub(half));
   })().compute(count).setName('Update Particles');
 
-  // RENDER (Color Palette)
+  // RENDER: PALETA GALÁCTICA PURA
   const material = new THREE.SpriteNodeMaterial({
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -105,26 +101,41 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   material.colorNode = Fn(() => {
     const pID = hash(instanceIndex);
     const isHigh = step(0.5, pID);
-    const isGrave = step(pID, 0.5);
 
     const speed = velocityBuffer.toAttribute().length();
     const speedNorm = speed.div(params.maxSpeed).clamp(0.0, 1.0);
-    const tColor = speedNorm.mul(0.5).add(pID.mul(0.2));
+    
+    // tColor recorre el gradiente basado en velocidad y el ID de la partícula
+    const tColor = speedNorm.add(pID.mul(0.5)).mod(1.0);
 
-    const aG = vec3(0.5, 0.1, 0.6);
-    const bG = vec3(0.4, 0.2, 0.4);
-    const cG = vec3(1.0, 1.0, 1.0);
-    const dG = vec3(0.0, 0.33, 0.67);
-    const rgbGrave = aG.add(bG.mul(cos(cG.mul(tColor).add(dG).mul(6.28318))));
+    // 1. NEBULOSA (Graves): Vacío Oscuro -> Violeta -> Rosa Cósmico
+    const cG1 = color('#0a001a');
+    const cG2 = color('#6600ff');
+    const cG3 = color('#ff00aa');
+    const rgbGrave = mix(
+      mix(cG1, cG2, tColor.mul(2.0).clamp(0.0, 1.0)),
+      cG3,
+      tColor.sub(0.5).mul(2.0).clamp(0.0, 1.0)
+    );
 
-    const aA = vec3(0.1, 0.6, 0.8);
-    const bA = vec3(0.1, 0.4, 0.4);
-    const cA = vec3(1.0, 1.0, 1.0);
-    const dA = vec3(0.5, 0.2, 0.0);
-    const rgbAgudo = aA.add(bA.mul(cos(cA.mul(tColor).add(dA).mul(6.28318))));
+    // 2. ESTRELLAS (Agudos): Espacio Profundo -> Cyan -> Estrella Blanca
+    const cA1 = color('#00051a');
+    const cA2 = color('#00f2ff');
+    const cA3 = color('#ffffff');
+    const rgbAgudo = mix(
+      mix(cA1, cA2, tColor.mul(2.0).clamp(0.0, 1.0)),
+      cA3,
+      tColor.sub(0.5).mul(2.0).clamp(0.0, 1.0)
+    );
 
-    const rgbFinal = mix(rgbGrave, rgbAgudo, isHigh);
-    const brightness = speedNorm.mul(1.5).add(0.5);
+    // Mutación con la tecla C (Intercambia paletas)
+    const finalGrave = mix(rgbGrave, rgbAgudo, params.colorPhase);
+    const finalAgudo = mix(rgbAgudo, rgbGrave, params.colorPhase);
+
+    const rgbFinal = mix(finalGrave, finalAgudo, isHigh);
+    
+    // Hacemos que la "nebulosa" base sea muy brillante
+    const brightness = speedNorm.mul(1.5).add(0.8); 
     
     return vec4(rgbFinal.mul(brightness), 1.0);
   })();

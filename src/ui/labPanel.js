@@ -108,7 +108,7 @@ export function createLabPanel({ params, onReset, onPreset, onModeChange, onPaus
   postGroup.className = 'group';
   postGroup.innerHTML = `
     <h2>4. Lente (Post-Procesamiento)</h2>
-    <p class="desc">Distorsión de barril, separación RGB y resplandor.</p>
+    <p class="desc">Z: Reversa | X: Implosión | C: Muta Colores</p>
   `;
   panel.append(postGroup);
   refreshers.push(rangeRow(postGroup, 'Fish Eye', state, 'fishEye', -0.5, 1.0, 0.01, (v) => params.fishEye.value = v, () => params.fishEye.value));

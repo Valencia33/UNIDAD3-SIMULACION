@@ -47,10 +47,7 @@ async function main() {
   const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   postCamera.position.z = 1; 
 
-  const postMaterial = new THREE.MeshBasicMaterial({
-    depthWrite: false,
-    depthTest: false
-  });
+  const postMaterial = new THREE.MeshBasicMaterial({ depthWrite: false, depthTest: false });
   const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial);
   postScene.add(postQuad);
 
@@ -93,7 +90,83 @@ async function main() {
     return vec4(bloomColor.mul(vignette), 1.0);
   })();
 
-  // UI y Controles
+  // === SINTETIZADOR DE BAJOS ===
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioContext();
+
+  const BPM = 122; 
+  const stepDuration = (60 / BPM) / 4; 
+  let nextStepTime = 0;
+  let currentStepIndex = 0;
+  let isAudioReady = false;
+
+  document.body.addEventListener('click', () => {
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    if (!isAudioReady) {
+      isAudioReady = true;
+      nextStepTime = audioCtx.currentTime + 0.1; 
+    }
+  });
+  
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.5; // Un poco de más volumen para los graves
+  masterGain.connect(audioCtx.destination);
+
+  let synthFlash = 0.0; 
+
+  function playSynth(frequency, time) {
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const filter = audioCtx.createBiquadFilter();
+    const vca = audioCtx.createGain();
+
+    // Textura principal y Sub-bajo
+    osc1.type = 'sawtooth';
+    osc1.frequency.value = frequency;
+    osc2.type = 'square';
+    osc2.frequency.value = frequency * 0.5; // Una octava por debajo exacto
+
+    filter.type = 'lowpass';
+    filter.Q.value = 4.0; // Resonancia controlada para un "Acid Pluck"
+
+    // Envolvente de volumen percusiva
+    vca.gain.setValueAtTime(0, time);
+    vca.gain.linearRampToValueAtTime(0.6, time + 0.01);
+    vca.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+
+    // Envolvente de filtro (hace que suene "ácido" y brillante al inicio)
+    filter.frequency.setValueAtTime(50, time);
+    filter.frequency.exponentialRampToValueAtTime(1200, time + 0.02);
+    filter.frequency.exponentialRampToValueAtTime(100, time + 0.25);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    filter.connect(vca);
+    vca.connect(masterGain); 
+
+    osc1.start(time);
+    osc2.start(time);
+    
+    osc1.stop(time + 0.3);
+    osc2.stop(time + 0.3);
+  }
+
+  // Patrones de Bajos en Do Menor (Dos octavas más graves)
+  const arpPatterns = {
+    'KeyA': [65.41, 98.00, 77.78, 130.81], // Cm
+    'KeyS': [77.78, 116.54, 98.00, 155.56], // EbMaj
+    'KeyD': [87.31, 130.81, 103.83, 174.61], // Fm
+    'KeyF': [98.00, 146.83, 116.54, 196.00], // Gm
+    'KeyG': [116.54, 174.61, 146.83, 233.08]  // BbMaj
+  };
+
+  const activeKeys = {
+    'KeyA': false, 'KeyS': false, 'KeyD': false, 'KeyF': false, 'KeyG': false
+  };
+  // ========================================================
+
   let paused = false;
   let mode = 'LAB';
   let panel;
@@ -105,7 +178,7 @@ async function main() {
     if (id === 'disco') {
       params.ringRadius.value = 3.0;
       params.ring2Radius.value = 5.0;
-      params.highsTurbulence.value = 0.5;
+      params.highsTurbulence.value = 0.0;
     } else if (id === 'storm') {
       params.ring2Radius.value = 8.0;
       params.highsTurbulence.value = 15.0;
@@ -121,7 +194,7 @@ async function main() {
     axes.visible = lab;
     hud.innerHTML = lab
       ? '<strong>LAB</strong> · P: performance · R: reset'
-      : '<strong>PERFORMANCE</strong> · RATÓN: Azules · ESPACIO: Kick Moradas · SHIFT: Freeze';
+      : '<strong>PERF:</strong> RATÓN (Azules) · ESPACIO (Kick) · SHIFT (Slow-Mo) · Z/X/C (Lentes) · A/S/D/F/G (Arpegio Bajo)';
   };
 
   panel = createLabPanel({
@@ -137,22 +210,27 @@ async function main() {
   document.body.append(hud);
   setMode('LAB');
 
-  // INTERACCIONES
   addEventListener('pointermove', (event) => {
     if (mode === 'PERFORMANCE') {
-      const x = (event.clientX / innerWidth) * 2 - 1;
-      const y = -(event.clientY / innerHeight) * 2 + 1;
-      params.ring2Radius.value = 5.0 + (x * 3.0); 
-      params.highsTurbulence.value = (y + 1) * 3.0; 
+      const x = (event.clientX / innerWidth) * 2 - 1; 
+      const y = -(event.clientY / innerHeight) * 2 + 1; 
+      
+      params.ring2Radius.value = 6.0 + (x * 5.0); 
+      params.highsTurbulence.value = Math.max(0.0, y * 20.0); 
     }
   });
 
-  // SISTEMA DE TRANSICIÓN SUAVE (LERP) PARA LA BARRA ESPACIADORA
   let isSpaceDown = false;
   let kickProgress = 0.0;
   
   let savedDamping = params.damping.value;
   let baseRingRadius = params.ringRadius.value;
+  let baseRing2Radius = params.ring2Radius.value;
+  let baseGrav = params.gravityStrength.value;
+  let baseGrav2 = params.ring2Gravity.value;
+  let baseSwirl = params.swirlStrength.value;
+  let baseHighsSwirl = params.highsSwirl.value;
+
   let baseFishEye = params.fishEye.value;
   let baseAberration = params.chromaticAberration.value;
   let baseBloom = params.bloomStrength.value;
@@ -160,21 +238,52 @@ async function main() {
 
   addEventListener('keydown', (event) => {
     if (event.repeat) return;
+
+    if (arpPatterns[event.code] && mode === 'PERFORMANCE') {
+      activeKeys[event.code] = true;
+    }
+
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     if (event.code === 'KeyR') simulation.reset();
     
     if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
       savedDamping = params.damping.value;
-      params.damping.value = 0.95; 
-      params.chromaticAberration.value = 0.025;
+      params.damping.value = 0.4; 
+      params.timeScale.value = 0.2; 
+      params.chromaticAberration.value = 0.025; 
       panel?.refresh();
+    }
+
+    if (event.code === 'KeyZ') {
+      baseSwirl = params.swirlStrength.value;
+      baseHighsSwirl = params.highsSwirl.value;
+      params.swirlStrength.value = -15.0; 
+      params.highsSwirl.value = -20.0;
+      panel?.refresh();
+    }
+
+    if (event.code === 'KeyX') {
+      baseRingRadius = params.ringRadius.value;
+      baseRing2Radius = params.ring2Radius.value;
+      baseGrav = params.gravityStrength.value;
+      baseGrav2 = params.ring2Gravity.value;
+
+      params.ringRadius.value = 0.1;
+      params.ring2Radius.value = 0.1;
+      params.gravityStrength.value = 25.0; 
+      params.ring2Gravity.value = 25.0;
+      params.fishEye.value = -0.5; 
+      panel?.refresh();
+    }
+
+    if (event.code === 'KeyC') {
+      params.colorPhase.value = 1.0; 
     }
 
     if (event.code === 'Space') {
       event.preventDefault();
       if (!isSpaceDown) {
         isSpaceDown = true;
-        // Guardamos la configuración del LAB como punto de partida
         baseRingRadius = params.ringRadius.value;
         baseFishEye = params.fishEye.value;
         baseAberration = params.chromaticAberration.value;
@@ -185,12 +294,36 @@ async function main() {
   });
 
   addEventListener('keyup', (event) => {
+    if (arpPatterns[event.code]) {
+      activeKeys[event.code] = false;
+    }
+
     if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
       params.damping.value = savedDamping; 
-      // Si no estamos pulsando espacio, restauramos la aberración cromática
+      params.timeScale.value = 1.0; 
       if (!isSpaceDown) params.chromaticAberration.value = baseAberration;
       panel?.refresh();
     }
+    
+    if (event.code === 'KeyZ') {
+      params.swirlStrength.value = baseSwirl; 
+      params.highsSwirl.value = baseHighsSwirl;
+      panel?.refresh();
+    }
+
+    if (event.code === 'KeyX') {
+      params.ringRadius.value = baseRingRadius;
+      params.ring2Radius.value = baseRing2Radius;
+      params.gravityStrength.value = baseGrav; 
+      params.ring2Gravity.value = baseGrav2;
+      params.fishEye.value = baseFishEye;
+      panel?.refresh();
+    }
+
+    if (event.code === 'KeyC') {
+      params.colorPhase.value = 0.0; 
+    }
+
     if (event.code === 'Space') {
       isSpaceDown = false;
     }
@@ -205,15 +338,36 @@ async function main() {
 
   simulation.reset();
 
-  // FRAME LOOP
   renderer.setAnimationLoop(() => {
     if (!paused) {
       params.time.value += params.dt.value * params.timeScale.value;
       simulation.stepSimulation();
     }
 
-    // --- LÓGICA DE TRANSICIÓN (0.25 segundos) ---
-    // A 60 FPS (dt aprox 1/60), para llegar de 0 a 1 en 0.25s:
+    // === SCHEDULER DEL ARPEGIADOR ===
+    if (isAudioReady && audioCtx.state === 'running') {
+      while (nextStepTime < audioCtx.currentTime + 0.1) {
+        let notePlayedThisStep = false;
+        
+        for (const [key, isPressed] of Object.entries(activeKeys)) {
+          if (isPressed) {
+            const pattern = arpPatterns[key];
+            const noteFreq = pattern[currentStepIndex % pattern.length];
+            playSynth(noteFreq, nextStepTime);
+            notePlayedThisStep = true;
+          }
+        }
+
+        if (notePlayedThisStep) {
+          synthFlash = 1.0; 
+        }
+
+        nextStepTime += stepDuration; 
+        currentStepIndex++;
+      }
+    }
+    // ================================
+
     const transitionSpeed = (1 / 60) / 0.25;
 
     if (isSpaceDown) {
@@ -222,19 +376,24 @@ async function main() {
       kickProgress = Math.max(0.0, kickProgress - transitionSpeed);
     }
 
-    // Interpolar (Lerp) todos los valores en cada frame
+    synthFlash = Math.max(0.0, synthFlash - 0.05);
+
     params.kickForce.value = THREE.MathUtils.lerp(0.0, 10.0, kickProgress);
-    params.ringRadius.value = THREE.MathUtils.lerp(baseRingRadius, 3.8, kickProgress);
     
-    // Si Shift no está pisando la aberración, la animamos normalmente
-    if (params.damping.value !== 0.95) {
+    if (params.ringRadius.value !== 0.1) {
+        params.ringRadius.value = THREE.MathUtils.lerp(baseRingRadius, 3.8, kickProgress);
+    }
+    
+    if (params.damping.value !== 0.4) { 
       params.chromaticAberration.value = THREE.MathUtils.lerp(baseAberration, 0.025, kickProgress);
     }
     
-    params.fishEye.value = THREE.MathUtils.lerp(baseFishEye, 1.0, kickProgress);
-    params.bloomStrength.value = THREE.MathUtils.lerp(baseBloom, 0.020, kickProgress);
+    if (params.fishEye.value !== -0.5) {
+        params.fishEye.value = THREE.MathUtils.lerp(baseFishEye, 1.0, kickProgress);
+    }
+
+    params.bloomStrength.value = THREE.MathUtils.lerp(baseBloom, 0.020, kickProgress) + (synthFlash * 0.025);
     params.vignette.value = THREE.MathUtils.lerp(baseVignette, 2.0, kickProgress);
-    // ---------------------------------------------
 
     orbit.update();
 
