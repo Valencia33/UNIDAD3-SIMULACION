@@ -111,7 +111,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     // 1. NEBULOSA (Graves): Vacío Oscuro -> Violeta -> Rosa Cósmico
     const cG1 = color('#0a001a');
     const cG2 = color('#6600ff');
-    const cG3 = color('#ff00aa');
+    const cG3 = color('#ff0051');
     const rgbGrave = mix(
       mix(cG1, cG2, tColor.mul(2.0).clamp(0.0, 1.0)),
       cG3,
@@ -119,9 +119,9 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     );
 
     // 2. ESTRELLAS (Agudos): Espacio Profundo -> Cyan -> Estrella Blanca
-    const cA1 = color('#00051a');
+    const cA1 = color('#001569');
     const cA2 = color('#00f2ff');
-    const cA3 = color('#ffffff');
+    const cA3 = color('#cb82ff');
     const rgbAgudo = mix(
       mix(cA1, cA2, tColor.mul(2.0).clamp(0.0, 1.0)),
       cA3,
