@@ -253,6 +253,74 @@ async function main() {
     renderTarget.setSize(innerWidth, innerHeight); 
   });
 
+  // ==========================================
+  // SCRIPT DE PRUEBAS BASE (TECLAS 1, 2, 3, 4, 5 y 0)
+  // ==========================================
+  window.addEventListener('keydown', (event) => {
+    // Usamos event.key para que funcione con los números de arriba y el teclado numérico
+    const key = event.key;
+    let changed = false;
+
+    if (key === '1') {
+      console.log("Prueba 1: Magnitud Cero (Calma total)");
+      params.gravityStrength.value = 0.0;
+      params.swirlStrength.value = 0.0;
+      params.highsSwirl.value = 0.0;
+      params.highsTurbulence.value = 0.0;
+      changed = true;
+    }
+    
+    if (key === '2') {
+      console.log("Prueba 2: Inversión de Signo (Repulsión)");
+      params.gravityStrength.value = -6.0;
+      changed = true;
+    }
+    
+    if (key === '3') {
+      console.log("Prueba 3: Límite de Velocidad");
+      params.maxSpeed.value = 0.5; // Todo se mueve ultra lento
+      params.swirlStrength.value = 50.0; // Fuerza brutal para forzar el límite
+      changed = true;
+    }
+    
+    if (key === '4') {
+      console.log("Prueba 4: Turbulencia Aislada");
+      params.gravityStrength.value = 0.0; 
+      params.swirlStrength.value = 0.0;
+      params.highsTurbulence.value = 40.0; // Solo caos en agudos
+      changed = true;
+    }
+    
+    if (key === '5') {
+      console.log("Prueba 5: Sin Fricción (Caos inestable)");
+      params.damping.value = 0.0;
+      changed = true;
+    }
+
+    if (key === '0') {
+      console.log("RESET DE PRUEBAS");
+      params.gravityStrength.value = 6.0;
+      params.swirlStrength.value = 2.0;
+      params.highsSwirl.value = 3.0;
+      params.highsTurbulence.value = 0.0;
+      params.maxSpeed.value = 12.0;
+      params.damping.value = 0.15;
+      changed = true;
+    }
+
+    // El truco maestro: forzar la actualización en la "base intocable" y mover los sliders
+    if (changed) {
+      baseState.gravityStrength = params.gravityStrength.value;
+      baseState.swirlStrength = params.swirlStrength.value;
+      baseState.highsSwirl = params.highsSwirl.value;
+      baseState.highsTurbulence = params.highsTurbulence.value;
+      baseState.damping = params.damping.value;
+      
+      if (panel) panel.refresh(); // Esto actualiza la interfaz visualmente
+    }
+  });
+  // ==========================================
+
   simulation.reset();
 
   renderer.setAnimationLoop(() => {
